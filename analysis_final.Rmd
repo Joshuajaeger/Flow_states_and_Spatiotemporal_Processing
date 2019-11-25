@@ -1,0 +1,663 @@
+---
+title: "Analysis"
+output: html_notebook
+---
+
+
+1.0 Install Packages
+```{r}
+install.packages("pacman")
+
+library(texreg)
+
+library(xtable)
+
+pacman::p_load(lme4, nlme, tidyverse, lmerTest, gridExtra, ggplot2, ggthemes, dplyr, sjstats, texreg, sjmisc, sjlabelled, sjPlot, devtools, brms, bayesplot, devtools, ggeffects, texreg, xtable)
+
+setwd("C:/Users/Manfred Mustermann/OneDrive/Dokumente/Science/Scotts lab/Temporal_order_judgment_task/OSF sauber/Code")
+
+
+```
+
+
+
+2.0 Hierarchical linear models
+2.1 Hierarchical linear models for the difference of the "just noticeable difference" (JND)
+
+2.1.0 load, prepare data for JND-models and defining nominal variables as factors
+
+```{r}
+data(withoutJND)
+
+hlmjnddata <-withoutJND %>% mutate(subject = as.factor(vpn), session = as.factor(session), prepost = as.factor(pre0post1), condition = as.factor(endo0exo1), domain = as.factor(m0a1))%>%
+  select(subject, flow, session, condition, JND, prepost, condition, domain, control)
+
+write.csv(hlmjnddata, "hlmjnddata.csv")
+
+
+#rescaling "flow"
+
+hlmjnddata$cflow<-scale(hlmjnddata$flow, scale = FALSE) # grand mean center the variable
+names(hlmjnddata)
+```
+
+
+
+2.1.1 Fully unconditional model
+```{r}
+m0.subject<- lmer(JND ~ (1|subject), hlmjnddata , REML = FALSE)
+m0.session<- lmer(JND ~ (1|subject/session), hlmjnddata , REML = FALSE)
+
+
+summary(m0.session)
+
+
+
+
+```
+2.1.1.1 Explained Variance by each Level
+
+```{r}
+# Intraclass Correlation Coefficient (ICC) of m0.subject
+performance::icc(m0.subject)
+
+
+#level 3
+132.6/(132.6+330.3+397.9) = 0.1540428
+
+#level 2 
+330.3/(132.6+330.3+397.9) = 0.3837128
+
+#level 1
+397.9/(132.6+330.3+397.9) = 0.4622444
+
+#Graphical indices
+
+boxplot(JND ~ subject, data = hlmjnddata)
+boxplot(JND ~ subject/session, data = hlmjnddata)
+
+```
+
+2.1.1.3 Normal distribution of the variable
+
+```{r}
+plot(density(hlmjnddata$cflow))
+plot(density(hlmjnddata$JND))
+shapiro.test(hlmjnddata$cflow)
+shapiro.test(hlmjnddata$JND)
+
+
+#Testing for normal distribution
+qqnorm(resid(m0.session)) + 
+  qqline(resid(m0.session)) 
+#There is some deviation from from the expected normal line towards the tails, but overall the line looks straight and therefore pretty normal and suggests that the assumption is not violated.
+
+
+```
+
+
+2.1.2 Pre/post as only predictor
+```{r}
+m1.jnd_prepost<- lmer(JND ~ prepost + (1|subject/session), hlmjnddata , REML = FALSE)
+m1.jnd_prepost_slope<- lmer(JND ~ prepost + (prepost|subject/session), hlmjnddata , REML = FALSE, control = lmerControl(optimizer ="Nelder_Mead"))
+
+```
+
+2.1.2.1 Anova M0 vs pre/post-model
+
+```{r}
+anova(m0.session, m1.jnd_prepost, m1.jnd_prepost_slope )
+```
+
+
+
+2.1.3 Endogenous/exogenous as categorical predictor
+```{r}
+m1.jnd_endoexo<- lmer(JND ~ prepost + condition + (1|subject/session), hlmjnddata , REML = FALSE)
+m1.jnd_endoexo_slope<- lmer(JND ~ prepost + condition + (1|subject/session) + (condition|subject), hlmjnddata , REML = FALSE, control = lmerControl(optimizer ="Nelder_Mead"))
+
+```
+
+2.1.3.1  Anova pre/post-model vs condition-model
+
+```{r}
+anova(m1.jnd_prepost, m1.jnd_endoexo, m1.jnd_endoexo_slope)
+```
+
+
+2.1.4 Flow as a predictor in the interaction with pre/post measurements
+
+```{r}
+m1.jnd_flow<- lmer(JND ~ prepost*cflow + condition + (1|subject/session), hlmjnddata , REML = FALSE)
+m1.jnd_flow_rnd<- lmer(JND ~ prepost*cflow + condition + (cflow|subject/session), hlmjnddata , REML = FALSE,  control = lmerControl(optimizer ="Nelder_Mead"))
+m1.jnd_flow_con<- lmer(JND ~ prepost*cflow * condition + (cflow|subject/session), hlmjnddata , REML = FALSE,  control = lmerControl(optimizer ="Nelder_Mead"))
+
+summary(m1.jnd_flow)
+summary(m1.jnd_flow_rnd)
+summary(m1.jnd_flow_con)
+confint(m1.jnd_flow_rnd, oldNames=F)
+tab_model(m1.jnd_flow, show.se = 1, show.obs=1, show.ngroups=0)
+
+texreg(m1.jnd_flow, ci.force=T, se.force=T, pvalues.force=T)
+xtable(coef(summary(m1.jnd_flow)))
+
+
+
+```
+
+
+2.1.4.1 Anova flow-model vs pre/post-model
+
+```{r}
+anova(m1.jnd_endoexo, m1.jnd_flow)
+```
+
+2.1.5. Domain as a predictor
+```{r}
+m1.jnd_flow_domain<- lmer(JND ~ prepost*domain+ (1|subject/session), hlmjnddata , REML = FALSE)
+summary(m1.jnd_flow_domain)
+tab_model(m1.jnd_flow_domain)
+```
+
+2.1.6. Influence of the control question
+```{r}
+m1.jnd_flow_control<- lmer(JND ~ prepost*cflow*control+ (1|subject/session), hlmjnddata , REML = FALSE)
+summary(m1.jnd_flow_control)
+tab_model(m1.jnd_flow_control)
+```
+
+
+
+2.2. Bayesian multilevel modeling of the JND
+
+
+```{r}
+m2.jnd_session_b<- brm(JND ~ (1|subject/session), hlmjnddata,  iter = 4000)
+m3.jnd_prepost_b<- brm(JND ~ prepost + (1|subject/session), hlmjnddata,  iter = 4000)
+m3.jnd_condition_b<- brm(JND ~ prepost*cflow + condition + (1|subject/session), hlmjnddata,  iter = 4000)
+am3.jnd_flow_b<- brm(JND ~ prepost*cflow + condition + (1|subject/session), hlmjnddata,  iter = 4000)
+m4.jnd_domain_b<- brm(JND ~ prepost*cflow*domain + condition + (1|subject/session), hlmjnddata,  iter = 4000)
+
+
+saveRDS(m3.jnd_flow_b, "b_JND_flow.rds")
+
+summary(m3.jnd_flow_b)
+summary(m4.jnd_domain_b)
+tab_model(m3.jnd_flow_b, show.se = T)
+
+
+
+
+  ```
+2.2.2. Bayesian models comparison
+
+https://cran.r-project.org/web/packages/loo/vignettes/loo2-example.html
+
+```{r}
+M0b.loo<-LOO(m2.jnd_session_b, reloo=1)
+M1b.loo<-LOO(m3.jnd_prepost_b, reloo=1)
+M2b.loo<-LOO(m3.jnd_condition_b, reloo=1)
+M3b.loo<-LOO(m3.jnd_flow_b, reloo=1)
+
+
+loo::compare(M0b.loo, M1b.loo, M2b.loo, M3b.loo)
+
+
+
+
+yrep <- posterior_predict(m3.jnd_flow_b)
+
+# requires bayesplot version >= 1.5.0
+```
+
+
+
+2.3 Plotts and tables
+
+
+2.3.1 Histogram of posterior samples of M3b
+
+```{r}
+m3.jnd_flow_b %>%
+  plot( 
+    combo = c("hist", "trace"), widths = c(1, 1.5),
+  theme = theme_bw(base_size = 10)
+)    
+
+```
+
+2.3.2 Table and Figure of the effects of Model 3b
+
+
+```{r}
+tab_model(m3.jnd_flow_b, show.se = 1, show.obs=1, show.ngroups=0, show.icc=0 )
+
+
+me<-marginal_effects(m3.jnd_flow_b,  effects = "cflow:prepost", ) 
+
+
+p1<- plot(me, plot=F, theme=apatheme)[[1]] + geom_ribbon(fill="#66000000", linetype="dotted" ) + scale_linetype_identity()
+
+
+p2 =p1 + geom_line(color="grey", start = 0.3, end = .6)
+
+p2
+
+p1
+```
+
+
+```{r}
+library(tidybayes)
+library(modelr)
+library(tidyverse)
+plot(me, plot=F)[[1]] %>% 
+  theme_tidybayes()
+
+m3.jnd_flow_b$prior
+
+test
+
+hlmjnddata %>%
+  data_grid(subject,prepost,condition,session,cflow=seq_range(cflow, n =10)) %>%
+  add_fitted_draws(m3.jnd_flow_b,
+                   allow_new_levels=T) %>% 
+  ggplot(aes(x=cflow, y=JND))+
+  geom_line(aes(y=.value,
+            group = .draw))+
+  theme_tidybayes()
+  
+```
+
+
+
+2.3.2 Comparison of the estimated bayesian and frequentistic Model
+
+```{r}
+
+Ploteffects <-Comparison_Models %>% 
+  select(lCI,uCI, Mean, Parameter=Parameters, Model)
+show(Ploteffects)
+
+Ploteffects <- Ploteffects[-c(1, 6), ]
+show(Ploteffects)
+
+
+p <-ggplot() + 
+geom_errorbarh(data=Ploteffects, mapping=aes(y=Parameter, xmin=lCI, xmax=uCI, colour=Model, height=0.4)) +
+geom_point(data=Ploteffects, mapping=aes(y=Parameter, x=Mean, colour=Model), size=2)
+
+apatheme=theme_bw()+
+  theme(panel.grid.major=element_blank(),
+        panel.grid.minor=element_blank(),
+        panel.border=element_blank(),
+        axis.line=element_line(),
+        text=element_text(),
+        legend.title=element_blank())
+        
+
+q = p + scale_colour_grey(start = 0.3, end = .6)
+
+
+q + apatheme + geom_vline(xintercept = 0, linetype = "dotted")
+    
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+2.3 Hierarchical linear models for the difference of the "point of subjective simultaneity" (PSS)
+
+2.3.0 load, prepare data for PSS-models and defining nominal variables as factors
+
+```{r}
+data(withoutPSS)
+hlmpssdata <-withoutPSS %>% mutate(subject = as.factor(vpn), session = as.factor(session), prepost = as.factor(pre0post1), condition = as.factor(endo0exo1),  domain = as.factor(m0a1))%>%
+  select(subject, flow, session, condition, PSS = posdisPSS, prepost, condition, domain, control)
+
+
+
+hlmpssdata$cflow<-scale(hlmpssdata$flow, scale = FALSE) # grand mean center flow
+```
+
+
+
+2.3.1 Fully unconditional model
+```{r}
+m0.pss_subject<- lmer(PSS ~ (1|subject), hlmpssdata , REML = FALSE)
+m0.pss_session<- lmer(PSS ~ (1|subject/session), hlmpssdata , REML = FALSE)
+
+summary(m0.pss_subject)
+```
+2.3.1.1 Explained Variance by each Level
+
+```{r}
+# Intraclass Correlation Coefficient (ICC) of m0.subject
+performance::icc(m0.pss_subject)
+
+
+boxplot(PSS ~ subject, data = hlmpssdata)
+boxplot(PSS ~ subject/session, data = hlmpssdata)
+
+```
+
+2.3.1.3 Normal distribution of the variable
+
+```{r}
+plot(density(hlmpssdata$zflow))
+plot(density(hlmpssdata$PSS))
+shapiro.test(hlmpssdata$zflow)
+shapiro.test(hlmpssdata$PSS)
+
+
+#Testing for normal distribution
+qqnorm(resid(m0.pss_subject))
+qqline(resid(m0.pss_subject)) 
+#There is some deviation from from the expected normal line towards the tails, but overall the line looks straight and therefore pretty normal and suggests that the assumption is not violated.
+
+
+```
+
+
+2.3.2 Pre/post as only predictor
+```{r}
+m1.pss_prepost<- lmer(PSS ~ prepost + (1|subject), hlmpssdata , REML = FALSE)
+m1.pss_prepost_slope<- lmer(PSS ~ prepost + (prepost|subject), hlmpssdata , REML = FALSE, control = lmerControl(optimizer ="Nelder_Mead"))
+
+summary(m1.pss_prepost)
+
+```
+
+2.3.2.1 Anova M0 vs pre/post-model
+
+```{r}
+anova(m0.pss_subject, m1.pss_prepost)
+```
+
+
+
+2.3.3 condition as categorical predictor
+```{r}
+
+m1.pss_endoexo<- lmer(PSS ~  condition + (1|subject), hlmpssdata , REML = FALSE, control = lmerControl(optimizer ="Nelder_Mead"))
+m1.pss_endoexo_slope<- lmer(PSS ~  condition + (condition|subject), hlmpssdata , REML = FALSE, control = lmerControl(optimizer ="Nelder_Mead"))
+
+
+summary(m1.pss_endoexo_slope)
+tab_model(m1.pss_endoexo_slope)
+
+
+confint(m1.pss_endoexo_slope, oldNames=F)
+
+```
+
+2.3.3.1  Anova pre/post-model vs condition-model
+
+```{r}
+anova(m0.pss_subject, m1.pss_endoexo, m1.pss_endoexo_slope)
+```
+
+
+2.3.4 Flow as a predictor in the interaction with pre/post measurements
+
+```{r}
+m1.pss_flow<- lmer(PSS ~ prepost*cflow + condition + (condition|subject), hlmpssdata , REML = FALSE)
+m1.pss_flow_rnd<- lmer(PSS ~ prepost*cflow + condition + (prepost*flow|subject), hlmpssdata , REML = FALSE)
+m1.pss_flow_con<- lmer(PSS ~ prepost*cflow*condition + (condition|subject), hlmpssdata , REML = FALSE,  control = lmerControl(optimizer ="Nelder_Mead"))
+
+
+
+
+summary(m1.pss_flow)
+summary(m1.pss_flow_con)
+
+tab_model(m1.pss_flow, show.se = 1, show.obs=1, show.ngroups=0) # html table
+texreg(m1.pss_flow, ci.force=T, se.force=T, pvalues.force=T)  #latex table 1
+xtable(coef(summary(m1.pss_flow)))  #latex table 2
+```
+
+2.3.4.1 Anova flow-model vs pre/post-model
+
+```{r}
+anova(m1.pss_endoexo_slope, m1.pss_flow, m1.pss_flow_rnd, m1.pss_flow_con)
+```
+2.3.5. Domain as a predictor
+```{r}
+m1.pss_flow_domain<- lmer(PSS ~ domain + (1|subject), hlmpssdata , REML = FALSE)
+
+m1.pss_flow_domain_flow<- lmer(PSS ~ domain*prepost + (1|subject), hlmpssdata , REML = FALSE)
+
+
+summary(m1.pss_flow_domain_flow)
+
+```
+2.3.5 Domain as a predictor of the PSS
+```{r}
+m1.pss_domain<- lmer(PSS ~ prepost*domain+ (1|subject), hlmpssdata , REML = FALSE)
+summary(m1.pss_domain)
+tab_model(m1.pss_domain)
+```
+
+2.3.6. Influence of the control question
+```{r}
+m1.pss_flow_control<- lmer(PSS ~ prepost*cflow*control+ (1|subject/session), hlmpssdata , REML = FALSE)
+summary(m1.pss_flow_control)
+tab_model(m1.pss_flow_control)
+```
+
+
+
+
+
+2.4.1. Bayesian multilevel modeling
+
+```{r}
+m2.pss_session_b<- brm(PSS ~ (1|subject), hlmpssdata,  iter = 4000)
+m3.pss_prepost_b<- brm(PSS ~ prepost + (1|subject), hlmpssdata,  iter = 4000)
+m3.pss_condition_b<- brm(PSS ~ condition + (1|subject), hlmpssdata,  iter = 4000)
+m3.pss_condition_b<- brm(PSS ~ condition + (condition|subject), hlmpssdata,  iter = 4000)
+m3.pss_flow_b<- brm(PSS ~ prepost*cflow + condition + (condition|subject), hlmpssdata,  iter = 4000)
+
+
+summary(m3.pss_flow_b)
+
+
+
+
+
+
+
+tab_model(m3.pss_flow_b, show.se = 1, show.obs=1, show.ngroups=0)
+marginal_effects(m3.pss_flow_b)
+
+```
+2.4.2. Bayesian models comparison
+
+https://cran.r-project.org/web/packages/loo/vignettes/loo2-example.html
+
+```{r}
+loo5<-LOO(m2.pss_session_b, reloo=1)
+loo6<-LOO(m3.pss_prepost_b, reloo=1)
+loo7<-LOO(m3.pss_condition_b, reloo=1)
+loo8<-LOO(m3.pss_flow_b, reloo=1)
+
+loo::compare(loo5, loo6, loo7, loo8)
+
+
+
+yrep <- posterior_predict(m3.pss_flow_b)
+
+# requires bayesplot version >= 1.5.0
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+2.5 Exploratory Analysis
+
+
+2.5.1 Diffrences in Flow
+
+```{r}
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Figures and tables
+
+```{r}
+# Creating a neat and sound output 
+htmlreg(list(m0.session, m1.jnd_prepost, m1.jnd_prepost_slope, m1.jnd_endoexo, m1.jnd_endoexo_slope,  m1.jnd_flow), 
+          single.row = T, 
+          stars = numeric(0),
+          caption = "",
+          custom.note = "")
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
