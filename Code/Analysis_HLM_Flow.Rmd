@@ -8,14 +8,7 @@ output: html_notebook
 ```{r}
 install.packages("pacman")
 
-library(texreg)
-
-library(xtable)
-
 pacman::p_load(lme4, nlme, tidyverse, lmerTest, gridExtra, ggplot2, ggthemes, dplyr, sjstats, texreg, sjmisc, sjlabelled, sjPlot, devtools, brms, bayesplot, devtools, ggeffects, texreg, xtable)
-
-setwd("C:/Users/Manfred Mustermann/OneDrive/Dokumente/Science/Scotts lab/Temporal_order_judgment_task/OSF sauber/Code")
-
 
 ```
 
@@ -34,7 +27,6 @@ hlmjnddata <-withoutJND %>% mutate(subject = as.factor(vpn), session = as.factor
 
 write.csv(hlmjnddata, "hlmjnddata.csv")
 
-
 #rescaling "flow"
 
 hlmjnddata$cflow<-scale(hlmjnddata$flow, scale = FALSE) # grand mean center the variable
@@ -48,12 +40,7 @@ names(hlmjnddata)
 m0.subject<- lmer(JND ~ (1|subject), hlmjnddata , REML = FALSE)
 m0.session<- lmer(JND ~ (1|subject/session), hlmjnddata , REML = FALSE)
 
-
 summary(m0.session)
-
-
-
-
 ```
 2.1.1.1 Explained Variance by each Level
 
@@ -78,21 +65,21 @@ boxplot(JND ~ subject/session, data = hlmjnddata)
 
 ```
 
-2.1.1.3 Normal distribution of the variable
+2.1.1.3 Normal distribution of the variables
 
 ```{r}
 plot(density(hlmjnddata$cflow))
 plot(density(hlmjnddata$JND))
+
+#Testing for normal distribution
 shapiro.test(hlmjnddata$cflow)
 shapiro.test(hlmjnddata$JND)
 
 
-#Testing for normal distribution
+
 qqnorm(resid(m0.session)) + 
-  qqline(resid(m0.session)) 
+qqline(resid(m0.session)) 
 #There is some deviation from from the expected normal line towards the tails, but overall the line looks straight and therefore pretty normal and suggests that the assumption is not violated.
-
-
 ```
 
 
@@ -108,7 +95,6 @@ m1.jnd_prepost_slope<- lmer(JND ~ prepost + (prepost|subject/session), hlmjnddat
 ```{r}
 anova(m0.session, m1.jnd_prepost, m1.jnd_prepost_slope )
 ```
-
 
 
 2.1.3 Endogenous/exogenous as categorical predictor
