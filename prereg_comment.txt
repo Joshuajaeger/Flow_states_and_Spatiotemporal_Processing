@@ -1,0 +1,39 @@
+Transparency allows the conversation to be meaningful.
+
+
+Changes:
+1. In our preregistration we have stated that: "The mean of the exogenous and endogenous underlying Just notable time differences is used to perform the conformity analysis. For explorative analysis, the two values are also considered separately." Since neither of the two values is sufficiently represented by simply averaging the two values, we have decided to integrate both values individually into our HLMs and include the distinction between endogenous and exogenous as a factor in our model.
+
+2. Since the co-authors of the study needed a little time to go through the preregistration and sign off, the submission and registration of the project was delayed. In the meantime, the following data was collected, but not processed or analyzed in any way. However, it was missed to indicate this correctly in the preregistration under the point: Sampling Plan/Existing Data. 
+
+Data collected before preregistration was registered:
+Flow_endo_post_2_001_2019_Mar_13_2030.csv
+Flow_endo_post_3_001_2019_Mar_26_1914.csv
+Flow_endo_post_3_002_2019_Mar_27_1845.csv
+Flow_endo_post_45_002_2019_Mar_29_1534.csv
+Flow_endo_post_64_001_2019_Mar_27_1554.csv
+Flow_endo_post_72_001_2019_Mar_27_1553.csv
+Flow_endo_post_7_002_2019_Mar_29_1533.csv
+Flow_endo_post_8_002_2019_Mar_29_1534.csv
+Flow_endo_pre_2_001_2019_Mar_13_1754.csv
+Flow_endo_pre_2_003_2019_Mar_22_1404.csv
+Flow_endo_pre_3_002_2019_Mar_27_1752.csv
+Flow_endo_pre_4_001_2019_Mar_27_1328.csv
+Flow_endo_pre_52_002_2019_Mar_29_1317.csv
+Flow_endo_pre_64_001_2019_Mar_27_1328.csv
+Flow_endo_pre_73_002_2019_Mar_29_1311.csv
+Flow_endo_pre_85_001_2019_Mar_27_1328.csv
+Flow_exo_post_2_002_2019_Mar_20_1248.csv
+Flow_exo_post_2_003_2019_Mar_22_1505.csv
+Flow_exo_post_41_001_2019_Mar_27_1554.csv
+Flow_exo_post_53_001_2019_Mar_27_1554.csv
+Flow_exo_post_54_002_2019_Mar_29_1535.csv
+Flow_exo_post_62_002_2019_Mar_29_1532.csv
+Flow_exo_post_85_001_2019_Mar_27_1554.csv
+Flow_exo_pre_2_002_2019_Mar_20_1042.csv
+Flow_exo_pre_3_001_2019_Mar_26_1803.csv
+Flow_exo_pre_42_002_2019_Mar_29_1341.csv
+Flow_exo_pre_5_001_2019_Mar_27_1328.csv
+Flow_exo_pre_62_002_2019_Mar_29_1309.csv
+Flow_exo_pre_72_001_2019_Mar_27_1328.csv
+Flow_exo_pre_82_002_2019_Mar_29_1325.csv
