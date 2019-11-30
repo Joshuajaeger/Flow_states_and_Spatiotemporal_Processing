@@ -1,0 +1,499 @@
+---
+title: "Analysis_TOJ_Flow"
+output: html_notebook
+---
+
+
+1.0 Install Packages
+```{r}
+install.packages("pacman")
+
+pacman::p_load(lme4, nlme, tidyverse, lmerTest, gridExtra, ggplot2, ggthemes, dplyr, sjstats, texreg, sjmisc, sjlabelled, sjPlot, devtools, brms, bayesplot, devtools, ggeffects, texreg, xtable, ggeffects)
+```
+
+
+
+2.0 Hierarchical linear models
+2.1 Hierarchical linear models for the difference of the "just noticeable difference" (JND)
+
+2.1.0 load, prepare data for JND-models and defining nominal variables as factors
+
+```{r}
+data(withoutJND)
+
+hlmjnddata <-withoutJND %>% mutate(subject = as.factor(vpn), session = as.factor(session), prepost = as.factor(pre0post1), condition = as.factor(endo0exo1), domain = as.factor(m0a1))%>%
+  select(subject, flow, session, condition, JND, prepost, condition, domain, control)
+
+#rescaling "flow"
+
+hlmjnddata$cflow<-scale(hlmjnddata$flow, scale = FALSE) # grand mean center the variable
+names(hlmjnddata)
+```
+
+
+2.1.1 Fully unconditional model
+
+```{r}
+m0.subject<- lmer(JND ~ (1|subject), hlmjnddata , REML = FALSE)
+m0.session<- lmer(JND ~ (1|subject/session), hlmjnddata , REML = FALSE)
+
+summary(m0.session)
+```
+
+
+2.1.1.1 Explained Variance by each Level
+
+```{r}
+#level 3
+132.6/(132.6+330.3+397.9) = 0.1540428
+
+#level 2 
+330.3/(132.6+330.3+397.9) = 0.3837128
+
+#level 1
+397.9/(132.6+330.3+397.9) = 0.4622444
+
+#Graphical indices
+
+boxplot(JND ~ subject, data = hlmjnddata)
+boxplot(JND ~ subject/session, data = hlmjnddata)
+
+```
+
+
+2.1.1.2 Normal distribution of the variables
+
+```{r}
+plot(density(hlmjnddata$cflow))
+plot(density(hlmjnddata$JND))
+shapiro.test(hlmjnddata$cflow)
+shapiro.test(hlmjnddata$JND)
+
+
+#Testing for normal distribution
+qqnorm(resid(m0.session)) + 
+qqline(resid(m0.session)) 
+#There is some deviation from from the expected normal line towards the tails, but overall the line looks straight and therefore pretty normal and suggests that the assumption is not violated.
+
+
+```
+
+
+2.1.2 Pre/post as only predictor
+
+```{r}
+m1.jnd_prepost<- lmer(JND ~ prepost + (1|subject/session), hlmjnddata , REML = FALSE)
+m1.jnd_prepost_slope<- lmer(JND ~ prepost + (prepost|subject/session), hlmjnddata , REML = FALSE, control = lmerControl(optimizer ="Nelder_Mead"))
+
+```
+
+
+2.1.2.1 Anova M0 vs pre/post-models
+
+```{r}
+anova(m0.session, m1.jnd_prepost, m1.jnd_prepost_slope )
+```
+
+
+2.1.3 Condition as predictor
+
+```{r}
+m1.jnd_endoexo<- lmer(JND ~ prepost + condition + (1|subject/session), hlmjnddata , REML = FALSE)
+m1.jnd_endoexo_slope<- lmer(JND ~ prepost + condition + (1|subject/session) + (condition|subject), hlmjnddata , REML = FALSE, control = lmerControl(optimizer ="Nelder_Mead"))
+
+```
+
+
+2.1.3.1  Anova pre/post-model vs condition-model
+
+```{r}
+anova(m1.jnd_prepost, m1.jnd_endoexo, m1.jnd_endoexo_slope)
+```
+
+
+2.1.4 Flow as a predictor in the interaction with pre/post measurements
+
+```{r}
+m1.jnd_flow<- lmer(JND ~ prepost*cflow + condition + (1|subject/session), hlmjnddata , REML = FALSE)
+m1.jnd_flow_rnd<- lmer(JND ~ prepost*cflow + condition + (cflow|subject/session), hlmjnddata , REML = FALSE,  control = lmerControl(optimizer ="Nelder_Mead"))
+m1.jnd_flow_con<- lmer(JND ~ prepost*cflow * condition + (cflow|subject/session), hlmjnddata , REML = FALSE,  control = lmerControl(optimizer ="Nelder_Mead"))
+
+summary(m1.jnd_flow)
+summary(m1.jnd_flow_rnd)
+summary(m1.jnd_flow_con)
+confint(m1.jnd_flow_rnd, oldNames=F)
+
+tab_model(m1.jnd_flow, show.se = 1, show.obs=1, show.ngroups=0) #html-table
+texreg(m1.jnd_flow, ci.force=T, se.force=T, pvalues.force=T) #Latex-table
+xtable(coef(summary(m1.jnd_flow))) #Latex-table
+
+```
+
+
+2.1.4.1 Anova flow-model vs condition-model
+
+```{r}
+anova(m1.jnd_endoexo, m1.jnd_flow)
+```
+
+
+2.1.5 Domain as a predictor
+
+```{r}
+m1.jnd_domain<- lmer(JND ~ domain + (1|subject/session), hlmjnddata , REML = FALSE)
+m1.jnd_domain_prepost<- lmer(JND ~ domain*prepost + (1|subject/session), hlmjnddata , REML = FALSE)
+
+summary(m1.jnd_domain)
+summary(m1.jnd_domain_prepost)
+```
+
+
+2.1.6 Influence of the control question on the interaction of pre/post and flow regardig to JND
+
+```{r}
+m1.jnd_flow_control<- lmer(JND ~ prepost*cflow * control+ (1|subject/session), hlmjnddata , REML = FALSE)
+
+summary(m1.jnd_flow_control)
+```
+
+
+2.2 Bayesian HLM of the JND
+
+```{r}
+m2.jnd_session_b<- brm(JND ~ (1|subject/session), hlmjnddata,  iter = 4000)
+m3.jnd_prepost_b<- brm(JND ~ prepost + (1|subject/session), hlmjnddata,  iter = 4000)
+m3.jnd_condition_b<- brm(JND ~ prepost*cflow + condition + (1|subject/session), hlmjnddata,  iter = 4000)
+m3.jnd_flow_b<- brm(JND ~ prepost*cflow + condition + (1|subject/session), hlmjnddata,  iter = 4000)
+
+saveRDS(m2.jnd_session_b, file = "m2.jnd_session_b.rds")
+saveRDS(m3.jnd_prepost_b, file = "m3.jnd_prepost_b.rds")
+saveRDS(m3.jnd_condition_b, file = "m3.jnd_condition_b.rds")
+saveRDS(m3.jnd_flow_b, file = "m3.jnd_flow_b.rds")
+
+summary(m3.jnd_flow_b)
+tab_model(m3.jnd_flow_b, show.se = T)
+```
+
+
+2.2.1 Bayesian models comparison
+
+```{r}
+loo1<-LOO(m2.jnd_session_b, reloo=1)
+loo2<-LOO(m3.jnd_prepost_b, reloo=1)
+loo3<-LOO(m3.jnd_condition_b, reloo=1)
+loo4<-LOO(m3.jnd_flow_b, reloo=1)
+
+loo::compare(loo1, loo2, loo3, loo4)
+```
+
+
+2.2.2 Histogram of posterior samples of M3b_JND
+
+```{r}
+m3.jnd_flow_b %>%
+  plot( 
+    combo = c("hist", "trace"), widths = c(1, 1.5),
+  theme = theme_bw(base_size = 10)
+)    
+
+```
+
+
+2.2.3 Figure of the effects of M3b_JND
+
+```{r}
+# create df for plotting
+summary_df <- ggpredict(m3.jnd_flow_b, c("cflow", "prepost"), )
+
+# define gray colors for the groups (pre; post)
+colours <- c("Black","Black") # for greyscale: #a8a7a7; #383838
+
+  x<-ggplot(summary_df,aes(x=x,y=predicted))+
+    geom_line(aes(color=group,linetype=group),
+              size=1.2)+ # change inner line size
+    geom_ribbon(aes(ymin = summary_df$conf.low, ymax = summary_df$conf.high,fill = group,colour = group),labels = c("Pre", "Post"), linetype = 0,alpha = 0.07)+ # produces conf. ribbons
+    labs(fill='Pre/Post') +
+     labs(color='Pre/Post') +
+    labs(linetype='Pre/Post')+
+    scale_y_continuous(limits = c(30,75))+ # define y-axis limits
+    theme_tufte(base_family = "GillSans")+ # make the plot tufte
+    ylab("JND")+ # y-axis label
+    xlab("Flow")+ # x-axis label
+    theme(axis.line = element_line(size = .5, color = "#969696"), # more plot aesthetics changes
+          axis.ticks = element_line(color = "#969696"),
+          axis.text.x = element_text(size = 14),
+          axis.text.y = element_text(size = 14),
+          text=element_text(size = 16),
+          plot.title = element_text(size =18,
+                                    hjust = 0.5),
+          axis.title.y = element_text(vjust = 0.5,
+                                      margin = margin(t = 0, r = 20, b = 0, l = 0)))+
+    scale_colour_manual(values=colours, labels = c("Pre", "Post")) + # apply defined colors
+    scale_fill_manual(values=colours, labels = c("Pre", "Post"))
+  
+show(x)
+
+ggsave("Figure-05.jpeg", plot = last_plot(), dpi = 900)
+```
+
+
+2.2.4 Plotting the differences of the estimated bayesian and frequentistic Model of the JND
+
+```{r}
+Ploteffects_JND <-Compare_Models_JND %>% 
+  select(lCI, uCI, Mean, Parameter=Parameters, Model)
+
+apatheme=theme_bw()+  #Creating APA conform Theme  
+  theme(panel.grid.major=element_blank(),
+        panel.grid.minor=element_blank(),
+        panel.border=element_blank(),
+        axis.line=element_line(),
+        text=element_text(),
+        legend.title=element_blank())
+
+a <- ggplot() + 
+  geom_errorbarh(data=Ploteffects_JND, mapping=aes(y=Parameter, xmin=lCI, xmax=uCI, colour=Model, height=0.4)) +
+  geom_point(data=Ploteffects_JND, mapping=aes(y=Parameter, x=Mean, colour=Model), size=2)
+
+Plott_dif_Models_JND <- a  + apatheme + geom_vline(xintercept = 0, linetype = "dotted") #Adding theme and lino on 0
+
+show(Plott_dif_Models_JND) 
+```
+
+
+
+
+
+
+2.3 Hierarchical linear models for the difference of the "point of subjective simultaneity" (PSS)
+
+2.3.0 load, prepare data for PSS-models and defining nominal variables as factors
+
+```{r}
+data(withoutPSS)
+hlmpssdata <-withoutPSS %>% mutate(subject = as.factor(vpn), session = as.factor(session), prepost = as.factor(pre0post1), condition = as.factor(endo0exo1),  domain = as.factor(m0a1))%>%
+  select(subject, flow, session, condition, PSS = posdisPSS, prepost, condition, domain, control)
+
+hlmpssdata$cflow<-scale(hlmpssdata$flow, scale = FALSE) # grand mean center flow
+```
+
+
+2.3.1 Fully unconditional model
+
+```{r}
+m0.pss_subject<- lmer(PSS ~ (1|subject), hlmpssdata , REML = FALSE)
+m0.pss_session<- lmer(PSS ~ (1|subject/session), hlmpssdata , REML = FALSE)
+
+summary(m0.pss_subject)
+```
+
+
+2.3.1.1 Explained Variance by each Level
+
+```{r}
+# Intraclass Correlation Coefficient (ICC) of m0.subject
+performance::icc(m0.pss_subject)
+
+boxplot(PSS ~ subject, data = hlmpssdata)
+boxplot(PSS ~ subject/session, data = hlmpssdata)
+
+```
+
+
+2.3.1.2 Normal distribution of the variabls
+
+```{r}
+plot(density(hlmpssdata$cflow))
+plot(density(hlmpssdata$PSS))
+shapiro.test(hlmpssdata$cflow)
+shapiro.test(hlmpssdata$PSS)
+
+
+#Testing for normal distribution
+qqnorm(resid(m0.pss_subject))
+qqline(resid(m0.pss_subject)) 
+#There is some deviation from from the expected normal line towards the tails, but overall the line looks straight and therefore pretty normal and suggests that the assumption is not violated.
+
+
+```
+
+
+2.3.2 Pre/post as only predictor
+
+```{r}
+m1.pss_prepost<- lmer(PSS ~ prepost + (1|subject), hlmpssdata , REML = FALSE)
+m1.pss_prepost_slope<- lmer(PSS ~ prepost + (prepost|subject), hlmpssdata , REML = FALSE, control = lmerControl(optimizer ="Nelder_Mead"))
+
+summary(m1.pss_prepost)
+```
+
+
+2.3.2.1 Anova M0 vs pre/post-model
+
+```{r}
+anova(m0.pss_subject, m1.pss_prepost)
+```
+
+
+2.3.3 Condition as predictor
+
+```{r}
+m1.pss_endoexo<- lmer(PSS ~  condition + (1|subject), hlmpssdata , REML = FALSE, control = lmerControl(optimizer ="Nelder_Mead"))
+m1.pss_endoexo_slope<- lmer(PSS ~  condition + (condition|subject), hlmpssdata , REML = FALSE, control = lmerControl(optimizer ="Nelder_Mead"))
+```
+
+
+2.3.3.1  Anova pre/post-model vs condition-model
+
+```{r}
+anova(m0.pss_subject, m1.pss_endoexo, m1.pss_endoexo_slope)
+```
+
+
+2.3.4 Flow as a predictor in the interaction with pre/post measurements
+
+```{r}
+m1.pss_flow<- lmer(PSS ~ prepost*cflow + condition + (condition|subject), hlmpssdata , REML = FALSE)
+m1.pss_flow_rnd<- lmer(PSS ~ prepost*cflow + condition + (prepost*flow|subject), hlmpssdata , REML = FALSE)
+m1.pss_flow_con<- lmer(PSS ~ prepost*cflow*condition + (condition|subject), hlmpssdata , REML = FALSE,  control = lmerControl(optimizer ="Nelder_Mead"))
+
+tab_model(m1.pss_flow, show.se = 1, show.obs=1, show.ngroups=0) # html table
+texreg(m1.pss_flow, ci.force=T, se.force=T, pvalues.force=T)  #latex table 1
+xtable(coef(summary(m1.pss_flow)))  #latex table 2
+```
+
+
+2.3.4.1 Anova flow-model vs condition-model
+
+```{r}
+anova(m1.pss_endoexo_slope, m1.pss_flow, m1.pss_flow_rnd, m1.pss_flow_con)
+```
+
+
+2.3.5 Domain as a predictor
+
+```{r}
+m1.pss_domain<- lmer(PSS ~ domain + (1|subject), hlmpssdata , REML = FALSE)
+m1.pss_domain_prepost<- lmer(PSS ~ domain*prepost + (1|subject), hlmpssdata , REML = FALSE)
+
+summary(m1.pss_domain)
+summary(m1.pss_domain_prepost)
+```
+
+
+2.3.6 Influence of the control question on the interaction of pre/post and flow regardig to PSS
+
+```{r}
+m1.pss_flow_control<- lmer(PSS ~ prepost*cflow * control+ (1|subject/session), hlmpssdata , REML = FALSE)
+
+summary(m1.pss_flow_control)
+```
+
+
+2.4 Bayesian HLM of the PSS
+
+```{r}
+m2.pss_session_b<- brm(PSS ~ (1|subject), hlmpssdata,  iter = 4000)
+m3.pss_prepost_b<- brm(PSS ~ prepost + (1|subject), hlmpssdata,  iter = 4000)
+m3.pss_condition_b<- brm(PSS ~ condition + (1|subject), hlmpssdata,  iter = 4000)
+m3.pss_condition_rnd_b<- brm(PSS ~ condition + (condition|subject), hlmpssdata,  iter = 4000)
+m3.pss_flow_b<- brm(PSS ~ prepost*cflow + condition + (condition|subject), hlmpssdata,  iter = 4000)
+
+saveRDS(m2.pss_session_b, file = "m2.pss_session_b.rds")
+saveRDS(m3.pss_prepost_b, file = "m3.pss_prepost_b.rds")
+saveRDS(m3.pss_condition_b, file = "m3.pss_condition_b.rds")
+saveRDS(m3.pss_condition_rnd_b, file = "m3.pss_condition_rnd_b.rds")
+saveRDS(m3.pss_flow_b, file = "m3.pss_flow_b.rds")
+
+summary(m3.pss_flow_b)
+tab_model(m3.pss_flow_b, show.se = 1, show.obs=1, show.ngroups=0)
+```
+
+
+2.4.1 Bayesian models comparison
+
+```{r}
+loo5<-LOO(m2.pss_session_b, reloo=1)
+loo6<-LOO(m3.pss_prepost_b, reloo=1)
+loo7<-LOO(m3.pss_condition_b, reloo=1)
+loo8<-LOO(m3.pss_condition_rnd_b, reloo=1)
+loo9<-LOO(m3.pss_flow_b, reloo=1)
+
+loo::compare(loo5, loo6, loo7, loo8, loo9)
+```
+
+
+2.4.2 Histogram of posterior samples of M3b_PSS
+
+```{r}
+m3.pss_flow_b %>%
+  plot( 
+    combo = c("hist", "trace"), widths = c(1, 1.5),
+  theme = theme_bw(base_size = 10)
+)    
+
+```
+
+
+2.4.3 Figure of the effects of M3b_PSS
+
+```{r}
+# create df for plotting
+summary_df_pss <- ggpredict(m3.pss_flow_b, c("cflow", "prepost"))
+
+# define gray colors for the groups (pre; post)
+colours <- c("Black","Black") # for greyscale: #a8a7a7; #383838
+
+y<-ggplot(summary_df_pss,aes(x=x,y=predicted))+
+  geom_line(aes(color=group,linetype=group),
+            size=1.2)+ # change inner line size
+  geom_ribbon(aes(ymin = summary_df_pss$conf.low, ymax = summary_df_pss$conf.high,fill = group,colour = group),labels = c("Pre", "Post"), linetype = 0,alpha = 0.07)+ # produces conf. ribbons
+  labs(fill='Pre/Post') +
+  labs(color='Pre/Post') +
+  labs(linetype='Pre/Post')+
+  scale_y_continuous(limits = c(0,100))+ # define y-axis limits
+  scale_x_continuous(limits = c(-1.6,1.6))+
+  theme_tufte(base_family = "GillSans")+ # make the plot tufte
+  ylab("PSS")+ # y-axis label
+  xlab("Flow")+ # x-axis label
+  theme(axis.line = element_line(size = .5, color = "#969696"), # more plot aesthetics changes
+        axis.ticks = element_line(color = "#969696"),
+        axis.text.x = element_text(size = 14),
+        axis.text.y = element_text(size = 14),
+        text=element_text(size = 16),
+        plot.title = element_text(size =18,
+                                  hjust = 0.5),
+        axis.title.y = element_text(vjust = 0.5,
+                                    margin = margin(t = 0, r = 20, b = 0, l = 0)))+
+  scale_colour_manual(values=colours, labels = c("Pre", "Post")) + # apply defined colors
+  scale_fill_manual(values=colours, labels = c("Pre", "Post"))
+
+show(y)
+
+ggsave("Figure-06.jpeg", plot = last_plot(), dpi = 900)
+```
+
+
+2.4.4 Plotting the differences of the estimated bayesian and frequentistic Model of the PSS
+
+```{r}
+Ploteffects_PSS <-Compare_Models_PSS %>% 
+  select(lCI, uCI, Mean, Parameter=Parameters, Model)
+
+apatheme=theme_bw()+  #Creating APA conform Theme  
+  theme(panel.grid.major=element_blank(),
+        panel.grid.minor=element_blank(),
+        panel.border=element_blank(),
+        axis.line=element_line(),
+        text=element_text(),
+        legend.title=element_blank())
+
+b <- ggplot() + 
+  geom_errorbarh(data=Ploteffects_PSS, mapping=aes(y=Parameter, xmin=lCI, xmax=uCI, colour=Model, height=0.4)) +
+  geom_point(data=Ploteffects_PSS, mapping=aes(y=Parameter, x=Mean, colour=Model), size=2)
+
+Plott_dif_Models_PSS <- b + apatheme + geom_vline(xintercept = 0, linetype = "dotted") #Adding Theme and line on 0
+
+show(Plott_dif_Models_PSS) 
+```
+

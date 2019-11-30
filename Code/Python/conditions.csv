@@ -1,0 +1,5 @@
+targetY;targetX;lineY;lineX;congr;corrAns;cueOri
+-0.4;0.4;0;90;1;left;180
+0.4;-0.4;90;0;1;right;0
+-0.4;0.4;0;90;1;left;180
+0.4;-0.4;90;0;1;right;0
