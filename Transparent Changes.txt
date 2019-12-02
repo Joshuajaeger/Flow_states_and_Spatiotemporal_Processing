@@ -4,7 +4,7 @@ Transparency allows the conversation to be meaningful.
 Changes:
 1. In our preregistration we have stated that: "The mean of the exogenous and endogenous underlying Just notable time differences is used to perform the conformity analysis. For explorative analysis, the two values are also considered separately." Since neither of the two values is sufficiently represented by simply averaging the two values, we have decided to integrate both values individually into our HLMs and include the distinction between endogenous and exogenous as a factor in our model.
 
-2. Since the co-authors of the study needed a little time to go through the preregistration and sign off, the submission and registration of the project was delayed. In the meantime, the following data was collected, but not processed or analyzed in any way. However, it was missed to indicate this correctly in the preregistration under the point: Sampling Plan/Existing Data. 
+2. Due to some delay in the submission and registration of the project on OSF, the following data was collected befor the preregistration was set up, but not processed or analyzed in any way. However, it was missed to indicate this correctly in the preregistration under the point: Sampling Plan/Existing Data. 
 
 Data collected before preregistration was registered:
 Flow_endo_post_2_001_2019_Mar_13_2030.csv
