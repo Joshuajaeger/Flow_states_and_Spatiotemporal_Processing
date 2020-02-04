@@ -61,9 +61,84 @@ boxplot(JND ~ subject/session, data = hlmjnddata)
 ```
 
 
-2.1.1.2 Normal distribution of the variables
+2.1.1.2 Means, distribution of the variables and cronbachs alpha of the nine subscales
 
 ```{r}
+###### Cronbachs Alpha & Mean for Subscales ######
+install.packages("psych")
+
+library(psych)
+
+
+
+df = cronbachs_alpha[,!(names(cronbachs_alpha) %in% c("File"))]
+
+## Creating Subscales
+my.keys <- list(CG = c("Q1", "Q2", "Q3"),co = c("Q4", "Q5", "Q6", "Q7"),UF = c("Q8", "Q9"),CS = c("Q10", "Q11", "Q12"),CN = c("Q13", "Q14"),SC = c("Q15", "Q16", "Q17"),AE = c("Q18", "Q19", "Q20"),MAA= c("Q22", "Q23", "Q26"),TT = c("Q21", "Q24", "Q25"))
+    my.scales <- scoreItems(my.keys,df)
+    my.scores <- my.scales$scores
+    my.scores
+                                      
+    describe(my.scores)
+    my.scales                                          
+                                          
+
+                                      
+## Cronbachs Alpha ##
+   
+    my.scales  
+    
+## Deeper Cronbachs Alpha Analysis
+         
+data(cronbachs_alpha)
+alpha(cronbachs_alpha, check.keys=F)
+
+## CG = clear goals
+
+alpha(cronbachs_alpha[c("Q1", "Q2", "Q3")], check.keys=F)
+
+##CO = concentration on task at hand;
+
+alpha(cronbachs_alpha[c("Q4", "Q5", "Q6", "Q7")], check.keys=F)
+
+
+## UF = unambiguous feedback
+
+alpha(cronbachs_alpha[c("Q8", "Q9")], check.keys=F)
+
+
+##CS = challenge skill balance
+
+alpha(cronbachs_alpha[c("Q10", "Q11", "Q12")], check.keys=F)
+
+
+##CN = sense of control
+
+alpha(cronbachs_alpha[c("Q13", "Q14")], check.keys=F)
+
+
+## SC = Loss of self-consciousness
+
+alpha(cronbachs_alpha[c("Q15", "Q16", "Q17")], check.keys=F)
+
+
+## AE = autotelic experience.
+
+alpha(cronbachs_alpha[c("Q18", "Q19", "Q20")], check.keys=F)
+
+
+## MAA = merging actions and awareness
+
+alpha(cronbachs_alpha[c("Q22", "Q23", "Q26")], check.keys=F)
+
+
+## TT = transformation of time;
+
+alpha(cronbachs_alpha[c("Q21", "Q24", "Q25")], check.keys=F)
+
+
+##Distribution
+
 plot(density(hlmjnddata$cflow))
 plot(density(hlmjnddata$JND))
 shapiro.test(hlmjnddata$cflow)
